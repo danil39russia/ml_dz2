@@ -1,0 +1,7 @@
+data/*.csv
+teta-ml-1-2025/
+*.zip
+__pycache__/
+.venv/
+.idea/
+.vscode/
