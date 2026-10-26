@@ -1,0 +1,54 @@
+version: 2
+
+sources:
+  - name: transactions_db
+    description: Сырые транзакции, загруженные в ClickHouse (ДЗ по ClickHouse).
+    schema: transactions_db
+    tables:
+      - name: transactions
+        description: Транзакции по банковским картам с признаком мошенничества. Одна строка — одна транзакция.
+        columns:
+          - name: transaction_time
+            description: Время транзакции.
+            tests: [not_null]
+          - name: merch
+            description: Мерчант (с технологическим префиксом `fraud_`).
+          - name: cat_id
+            description: Категория покупки (14 значений).
+            tests: [not_null]
+          - name: amount
+            description: Сумма транзакции, USD.
+            tests: [not_null]
+          - name: name_1
+            description: Имя клиента.
+          - name: name_2
+            description: Фамилия клиента.
+          - name: gender
+            description: Пол клиента (M/F).
+          - name: street
+            description: Улица клиента.
+          - name: one_city
+            description: Город клиента.
+          - name: us_state
+            description: Штат США, двухбуквенный код.
+            tests: [not_null]
+          - name: post_code
+            description: Почтовый индекс клиента.
+          - name: lat
+            description: Широта клиента.
+          - name: lon
+            description: Долгота клиента.
+          - name: population_city
+            description: Население города клиента.
+          - name: jobs
+            description: Профессия клиента.
+          - name: merchant_lat
+            description: Широта мерчанта.
+          - name: merchant_lon
+            description: Долгота мерчанта.
+          - name: target
+            description: Признак мошенничества (1 — фрод).
+            tests:
+              - accepted_values:
+                  values: [0, 1]
+                  quote: false

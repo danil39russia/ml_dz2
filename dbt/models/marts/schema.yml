@@ -1,0 +1,237 @@
+version: 2
+
+models:
+  - name: mart_daily_state_metrics
+    description: Дневные метрики по штатам — объём, средний чек, P95 и доля крупных транзакций.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [transaction_date, state]
+    columns:
+      - name: transaction_date
+        description: Дата.
+        tests: [not_null]
+      - name: state
+        description: Штат.
+        tests: [not_null]
+      - name: state_name
+        description: Название штата из справочника states.
+      - name: region
+        description: Регион США.
+      - name: transactions_cnt
+        description: Количество транзакций.
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 1
+      - name: total_amount
+        description: Сумма транзакций, USD.
+      - name: avg_check
+        description: Средний чек, USD.
+      - name: p95_amount
+        description: 95-й перцентиль суммы транзакции.
+      - name: large_tx_share_pct
+        description: Доля крупных транзакций (>= 500 USD), %.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 100
+      - name: fraud_cnt
+        description: Число мошеннических транзакций.
+
+  - name: mart_fraud_by_category
+    description: Фрод по категориям покупок — где мошенничество встречается чаще всего.
+    columns:
+      - name: category
+        description: Категория.
+        tests: [unique, not_null]
+      - name: transactions_cnt
+        description: Всего транзакций.
+      - name: fraud_cnt
+        description: Мошеннических транзакций.
+      - name: fraud_rate
+        description: Доля фрода, % (0–100).
+        tests: [not_null]
+      - name: total_amount
+        description: Оборот категории, USD.
+      - name: fraud_amount
+        description: Сумма мошеннических транзакций, USD.
+      - name: avg_fraud_amount
+        description: Средняя сумма мошеннической транзакции, USD.
+      - name: fraud_rate_rank
+        description: Ранг категории по fraud_rate (1 — самая рискованная).
+
+  - name: mart_fraud_by_state
+    description: География фрода — распределение по штатам США.
+    columns:
+      - name: state
+        description: Штат.
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('states')
+              field: state_code
+      - name: state_name
+        description: Название штата.
+      - name: region
+        description: Регион.
+      - name: transactions_cnt
+        description: Всего транзакций.
+      - name: fraud_cnt
+        description: Мошеннических транзакций.
+      - name: fraud_rate
+        description: Доля фрода, %.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 100
+      - name: unique_customers
+        description: Уникальных клиентов.
+      - name: unique_merchants
+        description: Уникальных мерчантов.
+      - name: total_amount
+        description: Оборот, USD.
+      - name: fraud_amount
+        description: Сумма фрода, USD.
+
+  - name: mart_customer_risk_profile
+    description: >
+      Профиль риска клиента. HIGH — 3+ фродовых транзакции или fraud_rate >= 10%,
+      MEDIUM — хотя бы одна фродовая транзакция, LOW — без фрода.
+    columns:
+      - name: customer_id
+        description: Суррогатный ключ клиента.
+        tests: [unique, not_null]
+      - name: first_name
+        description: Имя.
+      - name: last_name
+        description: Фамилия.
+      - name: gender
+        description: Пол.
+      - name: state
+        description: Штат.
+      - name: city
+        description: Город.
+      - name: first_transaction_at
+        description: Первая транзакция клиента.
+      - name: last_transaction_at
+        description: Последняя транзакция клиента.
+      - name: transactions_cnt
+        description: Количество транзакций (история клиента).
+      - name: fraud_cnt
+        description: Количество мошеннических транзакций.
+      - name: fraud_rate
+        description: Доля фрода у клиента, %.
+      - name: avg_check
+        description: Средний чек, USD.
+      - name: total_amount
+        description: Сумма всех транзакций, USD.
+      - name: avg_distance_km
+        description: Среднее расстояние до мерчанта, км.
+      - name: risk_segment
+        description: Сегмент риска.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["HIGH", "MEDIUM", "LOW"]
+
+  - name: mart_hourly_fraud_pattern
+    description: Временные паттерны фрода — день недели × час, окна повышенного риска.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [day_of_week, transaction_hour]
+      - dbt_expectations.expect_table_row_count_to_equal:
+          value: 168
+    columns:
+      - name: day_of_week
+        description: День недели ISO (1 — понедельник).
+      - name: transaction_hour
+        description: Час (0–23).
+      - name: transactions_cnt
+        description: Транзакций в слоте.
+      - name: fraud_cnt
+        description: Фродовых транзакций в слоте.
+      - name: fraud_rate
+        description: Доля фрода в слоте, %.
+      - name: fraud_amount
+        description: Сумма фрода в слоте, USD.
+      - name: fraud_rate_vs_avg
+        description: Во сколько раз fraud_rate слота выше среднего по всем слотам.
+      - name: is_high_risk_window
+        description: 1, если fraud_rate слота минимум вдвое выше среднего.
+        tests:
+          - accepted_values:
+              values: [0, 1]
+              quote: false
+
+  - name: mart_merchant_analytics
+    description: Аналитика по мерчантам — оборот, fraud_rate и флаг подозрительности.
+    columns:
+      - name: merchant
+        description: Мерчант.
+        tests: [unique, not_null]
+      - name: category
+        description: Основная категория мерчанта.
+      - name: transactions_cnt
+        description: Количество транзакций.
+      - name: turnover
+        description: Оборот, USD.
+      - name: avg_check
+        description: Средний чек, USD.
+      - name: fraud_cnt
+        description: Мошеннических транзакций.
+      - name: fraud_rate
+        description: Доля фрода, %.
+      - name: unique_customers
+        description: Уникальных клиентов.
+      - name: is_suspicious
+        description: 1, если у мерчанта >= 20 транзакций и fraud_rate в 3+ раза выше среднего по мерчантам.
+        tests:
+          - accepted_values:
+              values: [0, 1]
+              quote: false
+
+unit_tests:
+  - name: test_fraud_by_category_rate
+    description: fraud_rate считается в процентах, ранг 1 получает категория с наибольшей долей фрода.
+    model: mart_fraud_by_category
+    given:
+      - input: ref('stg_transactions')
+        rows:
+          - {category: "travel", amount: 100.0, is_fraud: 1}
+          - {category: "travel", amount: 50.0, is_fraud: 0}
+          - {category: "home", amount: 10.0, is_fraud: 0}
+          - {category: "home", amount: 20.0, is_fraud: 0}
+          - {category: "home", amount: 30.0, is_fraud: 1}
+          - {category: "home", amount: 40.0, is_fraud: 0}
+    expect:
+      rows:
+        - {category: "travel", transactions_cnt: 2, fraud_cnt: 1, fraud_rate: 50.0, total_amount: 150.0, fraud_amount: 100.0, fraud_rate_rank: 1}
+        - {category: "home", transactions_cnt: 4, fraud_cnt: 1, fraud_rate: 25.0, total_amount: 100.0, fraud_amount: 30.0, fraud_rate_rank: 2}
+
+  - name: test_customer_risk_segments
+    description: Клиент с 3 фродами — HIGH, с одним фродом из 11 (9%) — MEDIUM, без фрода — LOW.
+    model: mart_customer_risk_profile
+    given:
+      - input: ref('stg_transactions')
+        rows:
+          - {customer_id: "c_high", amount: 10.0, is_fraud: 1}
+          - {customer_id: "c_high", amount: 10.0, is_fraud: 1}
+          - {customer_id: "c_high", amount: 10.0, is_fraud: 1}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 1}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_medium", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_low", amount: 10.0, is_fraud: 0}
+          - {customer_id: "c_low", amount: 10.0, is_fraud: 0}
+    expect:
+      rows:
+        - {customer_id: "c_high", fraud_cnt: 3, risk_segment: "HIGH"}
+        - {customer_id: "c_medium", fraud_cnt: 1, risk_segment: "MEDIUM"}
+        - {customer_id: "c_low", fraud_cnt: 0, risk_segment: "LOW"}

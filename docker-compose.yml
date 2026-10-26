@@ -39,6 +39,7 @@ services:
       - ./sql/01_ddl.sql:/docker-entrypoint-initdb.d/01_ddl.sql:ro
       - ./sql/02_ddl_optimized.sql:/docker-entrypoint-initdb.d/02_ddl_optimized.sql:ro
       - ./sql:/sql:ro
+      - ./data:/var/lib/clickhouse/user_files/data:ro
     depends_on:
       kafka:
         condition: service_healthy
