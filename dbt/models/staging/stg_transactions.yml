@@ -1,0 +1,104 @@
+version: 2
+
+models:
+  - name: stg_transactions
+    description: >
+      Очищенные транзакции: нормализованные строки и типы, суррогатные ключи транзакции и клиента,
+      сегмент суммы (макрос amount_bucket), флаг крупной транзакции, расстояние клиент — мерчант.
+      Полные дубли строк удаляются, транзакции с неположительной суммой отбрасываются.
+    tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 700000
+          max_value: 800000
+    columns:
+      - name: transaction_id
+        description: Суррогатный ключ транзакции (dbt_utils.generate_surrogate_key по времени, мерчанту, сумме и клиенту).
+        tests: [unique, not_null]
+      - name: customer_id
+        description: Суррогатный ключ клиента (имя, фамилия, улица, индекс).
+        tests: [not_null]
+      - name: transaction_time
+        description: Время транзакции.
+        tests: [not_null]
+      - name: transaction_date
+        description: Дата транзакции.
+        tests: [not_null]
+      - name: transaction_hour
+        description: Час транзакции (0–23).
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 23
+      - name: day_of_week
+        description: День недели ISO (1 — понедельник, 7 — воскресенье), считается через dbt_date.day_of_week.
+        tests:
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6, 7]
+              quote: false
+      - name: merchant
+        description: Мерчант без технологического префикса `fraud_`.
+        tests: [not_null]
+      - name: category
+        description: Категория покупки.
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_distinct_count_to_equal:
+              value: 14
+      - name: amount
+        description: Сумма транзакции, USD, округлена до центов.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: false
+      - name: amount_bucket
+        description: Сегмент суммы (макрос amount_bucket).
+        tests:
+          - accepted_values:
+              values: ["micro", "small", "medium", "large", "huge"]
+      - name: is_large_amount
+        description: 1, если сумма не меньше var('large_amount_threshold') (500 USD).
+        tests:
+          - accepted_values:
+              values: [0, 1]
+              quote: false
+      - name: gender
+        description: Пол клиента.
+        tests:
+          - accepted_values:
+              values: ["M", "F"]
+      - name: state
+        description: Штат клиента (двухбуквенный код).
+        tests:
+          - not_null
+          - relationships:
+              to: ref('states')
+              field: state_code
+      - name: distance_km
+        description: Расстояние между клиентом и мерчантом, км.
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 20000
+      - name: is_fraud
+        description: Признак мошенничества (1 — фрод).
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+              quote: false
+
+seeds:
+  - name: states
+    description: Справочник штатов США (+ округ Колумбия) с регионом по классификации Census Bureau.
+    columns:
+      - name: state_code
+        description: Двухбуквенный код штата.
+        tests: [unique, not_null]
+      - name: state_name
+        description: Название штата.
+      - name: region
+        description: Регион (Northeast, Midwest, South, West).
+        tests:
+          - accepted_values:
+              values: ["Northeast", "Midwest", "South", "West"]

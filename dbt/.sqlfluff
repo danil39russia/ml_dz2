@@ -1,0 +1,25 @@
+[sqlfluff]
+dialect = clickhouse
+templater = dbt
+max_line_length = 120
+exclude_rules = ST06, AM04, CP03, RF04, AL03, LT01
+large_file_skip_byte_limit = 40000
+
+[sqlfluff:templater:dbt]
+project_dir = .
+profiles_dir = .
+
+[sqlfluff:indentation]
+tab_space_size = 4
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = consistent
+
+[sqlfluff:rules:aliasing.table]
+aliasing = explicit
+
+[sqlfluff:rules:aliasing.column]
+aliasing = explicit

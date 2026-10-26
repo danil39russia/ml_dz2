@@ -110,3 +110,7 @@ docker compose exec clickhouse clickhouse-client -q "EXPLAIN indexes = 1 SELECT 
 ```
 
 Результат запроса на обеих таблицах совпадает.
+
+## dbt
+
+Аналитический dbt-проект поверх этих данных — в каталоге [`dbt/`](dbt/README.md).

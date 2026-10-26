@@ -1,0 +1,40 @@
+name: fraud_analytics
+version: "1.0.0"
+config-version: 2
+
+profile: fraud_analytics
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages", "logs"]
+
+vars:
+  # порог «крупной» транзакции, USD
+  large_amount_threshold: 500
+  # минимальное число транзакций, чтобы считать fraud_rate мерчанта/клиента значимым
+  min_transactions_for_rate: 20
+
+models:
+  fraud_analytics:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
+
+seeds:
+  fraud_analytics:
+    +schema: staging
+    states:
+      +column_types:
+        state_code: String
+        state_name: String
+        region: String
+
+dispatch:
+  - macro_namespace: dbt_date
+    search_order: ["fraud_analytics", "dbt_date"]
